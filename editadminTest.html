@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- 
+    ============================================================================
+    项目需求提交方：    广元站 冯川宁
+    项目提交时间：      2024年6月
+    项目名称：          TRPS:Train Route Planning System
+    
+    Author：           Stark New
+    ====================================================
+    20240912:2024年9月12日
+    测试内容：g元素可以直接使用transform属性，
+    ----------------------------------------------------
+    20240913:2024年9月13日
+    工作内容：
+    一、测试保存数据到数据库；
+
+    二、测试提交文件到后台；
+
+    三、调整数据库；
+    需要增加：
+    1、方向，
+    2、前方站，
+    3、后方站，
+    车次，始发站，终点站，始发时间，终点时间，
+    担当局，
+    种类，
+    经由
+    站停时间
+    到站停留车的始发车次。
+    分界口
+    ====================================================
+
+
+    缩略词
+    
+    Schedule:   SCHED.
+    History:    Hist.
+    Station:    Sta.
+    display:    Disp.
+    search:     Srch.
+    Train:      Train.
+    TrainNo:    TrainNo.
+    =============================================================================
+
+-->
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRPS | 管理员 | 列车线路规划系统</title>
+  <script src="/static/js/jquery-3.7.1.min.js"></script>
+  <script src="/static/node_modules/moment/min/moment.min.js"></script>
+
+  <!-- 本站股道的初始化数据来源 -->
+  <script src="/static/js/railroad-line.js?v=1.1.7"></script>
+  <!-- 创建线路表格和股道名称 -->
+  <script src="/static/js/tableback.js?v=1.0.7"></script>
+
+  <!-- 按钮功能和弹出对话框 -->
+  <!-- <script src="./static/js/button.js?v=1.0.3"></script> -->
+
+  <link rel="stylesheet" href="/static/css/print.css?v=1.0.35" />
+  <link rel="stylesheet" href="/static/css/table.css?v=1.0.32" />
+  <link rel="stylesheet" href="/static/css/mystyle0607.css?v=1.0.5" />
+  <link rel="stylesheet" href="/static/css/endstyle.css?v=1.0.3" />
+
+  <link rel="shortcut icon" href="/static/imgs/favicon.ico" type="image/x-icon" />
+</head>
+
+<body>
+  <div class="top-title">
+    <div class="maintitle">
+      <span class="titlename unselectable">
+        <sapn class="userName unselectable" id="stationName"></sapn>旅客列车线路安排表
+      </span>
+      <div style="display: inline-block">
+        <label for="schedSelect" class="unselectable">运行图</label>
+        <select id="schedSelect" class="schedSelect" onchange="changeSched()"></select>
+      </div>
+      <button id="webPrint" type="button" class="btn commitbtn" onclick="trainLineTable()" title="生成本站的股道">
+        <span class="unselectable">股道生成</span>
+      </button>
+      <button id="webPrint" type="button" class="btn commitbtn" onclick="submitNewTrainSched()" title="提交新的旅客列车时刻表">
+        <span class="unselectable">创建新表</span>
+      </button>
+      <button id="webPrint" type="button" class="btn commitbtn" onclick="btn_historySearcher()" title="查询历史列车线路安排">
+        <span class="unselectable">查询编辑</span>
+      </button>
+      <!-- <button id="webPrint" type="button" class="btn commitbtn" onclick="printDocument()" title="打印最新列车线路安排"><span
+                    class="unselectable">打印报表</span></button> -->
+      <button id="test" type="button" class="btn commitbtn" onclick="saveData()" title="保存修改">
+        <span class="unselectable">保存修改</span>
+      </button>
+      <!-- 最后部署前处理 -->
+      <!-- <button id="test" type="button" class="btn commitbtn" onclick="findNextElement()" title="测试"><span
+                    class="unselectable">Test2</span></button>
+            <button id="test" type="button" class="btn commitbtn" onclick="gElementMove()" title="测试"><span
+                    class="unselectable">Test</span></button> -->
+      <!-- <button id="test" type="button" class="btn commitbtn" onclick="submit()" title="提交新的旅客列车时刻表"><span
+                    class="unselectable">提交</span></button> -->
+    </div>
+    <div class="top-title-bottom"></div>
+  </div>
+  <div id="main-box">
+    <div id="train-line-box" class="train-line-box">
+      <div id="train-line" class="train-line"></div>
+      <div id="trainLineBox" class="trainLineBox">
+        <!-- 创建绘图层 -->
+        <div id="drawing-layer" style="position: absolute; top: 51px; left: 0; z-index: 1">
+          <svg id="drawing-svg"></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <dialog id="trainLineDlg">
+      <div style="margin-bottom: 20px">
+        <span style="font-size: 28px; margin-right: 10px">股道生成</span><span class="userName" id="userName"></span>
+        <span>生成股道</span>
+        <select name="sel" id="sel">
+          <option value="">请选择股道数量</option>
+        </select>
+        <button type="button" id="trainLine-submit" class="btn btn-primary">
+          提交修改
+        </button>
+        <button type="button" id="trainLine-back-btn" class="btn btn-primary">
+          退出
+        </button>
+        <!-- <button id="creatbtn" type="button" class="btn btn-primary">新建/重置</button> -->
+      </div>
+      <div id="linetable"></div>
+      <!-- <div>
+                <button type="button" id="trainLine-submit" class="btn btn-primary">提交</button>
+                <button type="button" id="trainLine-back-btn" class="btn btn-primary">退出</button>
+            </div> -->
+    </dialog>
+    <dialog id="submitNewTrainLine">
+      <div style="margin-bottom: 20px">
+        <span style="font-size: 28px; margin-right: 10px">创建新表</span><span class="userName" id="userName"></span>
+        <a style="float: right" type="button" class="btn btn-primary" href="./template/trainRouteSchedule.xlsx"
+          download="列车运行图模板.xlsx">下载时刻表模板
+        </a>
+      </div>
+      <table>
+        <tr>
+          <td>
+            <span>新时刻表名称：</span>
+          </td>
+          <td>
+            <input type="text" id="input_newTrainSCHED" />
+          </td>
+        </tr>
+        <tr>
+          <td><span>新时刻表执行时间：</span></td>
+          <td>
+            <input id="input_workdate" class="textInput filled" type="date" placeholder="" data-placeholder="执行日期"
+              aria-label="执行日期" aria-required="true" required="" pattern="\d{4}-\d{2}-\d{2}"
+              title="执行时间输入格式为: YYYY-MM-DD" autofocus="autofocus" data-listener-added_0aa5854f="true" />
+          </td>
+        </tr>
+        <tr>
+          <!-- 输入文本框 -->
+          <td>
+            <span>新时刻表备注：</span>
+          </td>
+          <td>
+            <textarea id="input_newTrainSCHED_remark" rows="5" cols="50"></textarea>
+          </td>
+        </tr>
+      </table>
+      <div class="input-group">
+        <form id="uploadForm" enctype="multipart/form-data">
+          <label class="input-file-button" for="fileInput"> 选择文件 </label>
+          <!-- accept是xlsx -->
+          <input type="file" id="fileInput" name="file"
+            accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" controls="" />
+          <span id="uploadFileName"></span>
+        </form>
+      </div>
+
+      <div>
+        <h4>说明和要求：</h4>
+        <!-- <p>
+                    按模板格式，填写列车运行图信息；
+                </p> -->
+        <p>1、文件只能是xlsx格式，且不能超过5M；</p>
+        <p>2、表中的股道号码只能填写数字，不能填写罗马数字；</p>
+        <p>3、必须按模板格式，填写列车运行图基础信息。</p>
+      </div>
+      <div>
+        <div class="center-block" style="width: 250px; margin-top: 10px">
+          <button type="button" id="NewTrainLineFile-submit" class="btn btn-primary">
+            创建新时刻表
+          </button>
+          <button type="button" id="submitNewTrainLine-back-btn" class="btn btn-primary">
+            退出
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="historySearcher">
+      <div style="margin-bottom: 20px">
+        <span style="font-size: 28px; margin-right: 10px">查询编辑</span><span class="userName" id="userName"></span>
+      </div>
+      <div id="historyList"></div>
+      <div>
+        <div class="center-block" style="width: 100px">
+          <button type="button" id="historySearcher-back-btn" class="btn btn-primary">
+            退出
+          </button>
+        </div>
+      </div>
+    </dialog>
+  </div>
+  <!-- 显示g元素的详细信息的标签 -->
+  <div id="g-info-box" class="g-info-box"></div>
+  <!-- 右键菜单 -->
+  <!--
+    <div id="customMenu" class="hidden">
+      <ul>
+        <li onclick="menuItemClicked('选项1')">选项1</li>
+        <li onclick="menuItemClicked('选项2')">选项2</li>
+        <li onclick="menuItemClicked('选项3')">选项3</li>
+      </ul>
+    </div>
+-->
+  <div id="toast" class="toast" style="display: none"></div>
+  <!-- 测试用 -->
+  <div id="schedules"></div>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+  ///////////////////////////////////////////////////////////////////////////////////////////////
+  //newStark
+  // 20241018 0806 完全重构
+  //
+  ///////////////////////////////////////////////////////////////////////////////////////////////
+
+  //初始化声明
+  var localStation = ""; //站名，保存在客户端本地
+  var lineArray = []; //线路数组
+  const svg = document.getElementById("drawing-svg"); //获取SVG元素
+  var fileName = ""; //文件名
+  var svgHeight = 0; //SVG 的高度
+  var traintotal = 0; //线路总数
+
+  const maxTime = timeToMoment("00:20", "HH:mm"); //函数
+  const midnight = timeToMoment("24:00", "HH:mm"); // 24:00 代表午夜
+
+  var table = $("#train-line-table");
+
+  // 获取起点和终点的坐标
+  var containerOffset = {
+    top: 0,
+    left: 0,
+  };
+
+  var trOffset = 2; // 设置tr的偏移量值
+
+  ///////////////////////////////////////////////////////////////////
+  // ajax根据localStation向后台查询数据，初始化#schedSelect
+  ///////////////////////////////////////////////////////////////////
+  function getSchedList(localStation) {
+    $.ajax({
+      url: "/AjaxApp/getSchedDir.php",
+      type: "POST",
+      dataType: "json",
+      data: {
+        station: localStation,
+      },
+      success: function (data) {
+        console.log(data);
+        var schedList = data.trainSched;
+        var schedSelect = document.getElementById("schedSelect");
+        schedSelect.innerHTML = "";
+        for (var i = 0; i < schedList.length; i++) {
+          var option = document.createElement("option");
+          option.value = schedList[i].UUID;
+          option.text = schedList[i].station_sched_name;
+          schedSelect.appendChild(option);
+          // if (i == 0) {
+          //     option.selected = true;
+          // } // 默认选中第一个运行图
+        }
+      },
+    });
+  }
+  ///////////////////////////////////////////////////////////////////
+  // 执行函数：
+  ///////////////////////////////////////////////////////////////////
+  function changeSched() {
+    var sched_UUID = document.getElementById("schedSelect").value; // 获取选中的运行图
+    console.log(sched_UUID);
+
+    // 获取ID为'drawing-svg'的SVG元素
+    var svgElement = document.getElementById("drawing-svg");
+
+    // 检查该元素是否存在
+    if (svgElement) {
+      // 清空SVG元素内的所有子元素
+      while (svgElement.firstChild) {
+        svgElement.removeChild(svgElement.firstChild);
+      }
+    }
+    getHistoryTrainSchedule(sched_UUID);
+    //获取所有g元素
+    var gElements = document.querySelectorAll("g");
+    //设置z-index为100
+    for (var i = 0; i < gElements.length; i++) {
+      gElements[i].style.zIndex = 1000;
+    }
+  }
+
+  ///////////////////////////////////////////////////////////
+  // 提前执行的jquery
+  ///////////////////////////////////////////////////////////
+  $(function () {
+    if (localStorage.getItem("userInfo")) {
+      var userInfo = JSON.parse(localStorage.getItem("userInfo"));
+      localStation = userInfo.station;
+      //所有.userName的text改写为station
+      $(".userName").text(localStation);
+    }
+
+    // 如果localStation为空
+    if (localStation == "" || localStation == null) {
+      //显示"请登录使用"
+      $(".userName").text("请登录使用");
+    }
+    getSchedList(localStation); // 0->修改时刻表下拉框数据
+    init_trainLine(); //1->初始化线路,获取线路数组，
+    createLineNameTable(lineArray); //2-根据线路数组，绘制线路名称表格
+    createTable(lineArray); //3-绘制线路24h底层表格
+    getTrainSchedule(); //4-绘制列车时刻
+    //获取所有g元素，设置z-index为100，将默认的g元素置顶
+    var gElements = document.querySelectorAll("g");
+    for (var i = 0; i < gElements.length; i++) {
+      gElements[i].style.zIndex = 1000;
+    }
+  });
+  ////////////////////////////////////////////////////////////
+  // 执行函数：初始化线路,1->获取线路数组
+  ////////////////////////////////////////////////////////////
+  function init_trainLine() {
+    $.ajax({
+      url: "/AjaxApp/getLine.php",
+      type: "post",
+      dataType: "json",
+      // 使用同步方式
+      async: false,
+      data: {
+        station: localStation,
+      },
+      error: function (xhr, status, error) {
+        console.log(error);
+      },
+      success: function (data) {
+        // 判断是否有数据
+        if (!data.success) {
+          $("#linetable").html("请初始化本站数据");
+          return;
+        } else {
+          var line = data.lineNumbers;
+          //按","分劈成数组
+          lineArray = line.split(",");
+          traintotal = lineArray.length; //线路总数
+        }
+      },
+    });
+  }
+  /////////////////////////////////////////////////////////////
+  // 执行函数：获取列车时刻表，并调用处理函数绘制线路和列车时刻表
+  /////////////////////////////////////////////////////////////
+  function getTrainSchedule() {
+    // 确保localStation变量已定义
+    if (typeof localStation === "undefined") {
+      alert("本站站名未定义！");
+      return;
+    }
+    $.ajax({
+      url: "/AjaxApp/getTrainSchedule.php", // PHP脚本的URL
+      type: "POST", // 请求类型
+      dataType: "json", // 期望返回的数据类型
+      async: false, // 是否异步
+      data: {
+        localStation: localStation, // 发送的数据
+      },
+      success: function (response) {
+        console.log(response);
+        if (response.success) {
+          //createTrainSchedule();
+          processAndDisplayTrains(response.trainSched);
+        } else {
+          // 显示一个toast表示无数据
+          alert("没有列车时刻表！");
+        }
+      },
+      error: function (jqXHR, textStatus, errorThrown) {
+        console.error("请求列车时刻表失败: " + textStatus, errorThrown);
+      },
+    });
+  }
+  /////////////////////////////////////////////////////////////
+  // 执行函数：获取列车时刻表，并调用处理函数绘制线路和列车时刻表
+  /////////////////////////////////////////////////////////////
+
+  // 功能函数:使用 moment.js 将时间字符串转换为 moment 对象
+  function timeToMoment(time) {
+    return moment(time, "HH:mm");
+  }
+
+  // 功能函数：检查两个时间段是否重叠
+  function isOverlapping(trainA, trainB) {
+    const startA = timeToMoment(trainA.local_arrival_time);
+    const endA = timeToMoment(trainA.local_departure_time);
+    const startB = timeToMoment(trainB.local_arrival_time);
+    const endB = timeToMoment(trainB.local_departure_time);
+
+    // 对跨夜情况进行处理
+    if (endA.isBefore(startA)) endA.add(1, "day");
+    if (endB.isBefore(startB)) endB.add(1, "day");
+
+    return !(endA.isBefore(startB) || startA.isAfter(endB));
+  }
+
+  // 功能函数：检查是否是跨夜车次
+  function isOvernight(train) {
+    const start = timeToMoment(train.local_arrival_time);
+    const end = timeToMoment(train.local_departure_time);
+    return end.isBefore(start);
+  }
+
+  // 功能函数：检查是否是通过车
+  function isThrough(train) {
+    return train.local_arrival_time === train.local_departure_time;
+  }
+  /////////////////////////////////////////////////////////////////////
+  // 执行函数：对车次进行分类
+  // type：overnight——跨夜；through——通过车；normal——正常车次
+  // attribute：up——上显；down——下显
+  /////////////////////////////////////////////////////////////////////
+  function classifyTrainTwins(train, element, type, attribute) {
+
+    const endTime = timeToMoment(train.local_departure_time);
+    const startTime = timeToMoment(train.local_arrival_time);
+    // 1、跨夜车处理
+    if (type === "overnight") {
+      // 使用 moment 判断 endTime 时间是否大于 00:20
+      if (endTime.isAfter(maxTime)) {
+        // endTime 大于 00:20，分劈为两段时间
+        // 第一段：从 startTime 到 24:00
+        const firstSegment = {
+          id: train.local_arrival_train_number,
+          startTime: startTime.format("HH:mm"),
+          endTime: "24:00",
+          track: train.track,
+        };
+
+        // 第二段：从 00:00 到 endTime
+        const secondSegment = {
+          id: train.local_arrival_train_number,
+          startTime: "00:00",
+          endTime: endTime.format("HH:mm"),
+          track: train.track,
+        };
+
+        // 绘制第一段
+        classifyTrainTwins(firstSegment, element, "normal", attribute);
+
+        // 绘制第二段
+        classifyTrainTwins(secondSegment, element, "normal", attribute);
+
+        console.log('classifyTrainTwins | firstSegment', firstSegment);
+        console.log('classifyTrainTwins | secondSegment', secondSegment);
+
+        return;
+      } else {
+        // endTime 小于等于 00:20，直接绘制
+
+      }
+    }
+    // 2、通过车处理
+    if (type === "through") {
+      // 通过车的处理逻辑
+    }
+    // 3、最后摆位置
+    if (attribute === "up") {
+      // 车次在上面的处理逻辑
+    } else if (attribute === "down") {
+      // 车次在下面的处理逻辑
+    }
+
+    const trainElement = document.createElement("div");
+    trainElement.className = `train ${type ? type : ""}`;
+    trainElement.textContent = `${type ? type : ""} ${
+      train.local_arrival_train_number
+    } (${train.local_arrival_time} - ${train.local_departure_time})`;
+    element.appendChild(trainElement);
+  }
+
+
+  //单车次函数处理
+  function classifyTrainSingle(train, element, type) {
+    const endTime = timeToMoment(train.local_departure_time);
+    const startTime = timeToMoment(train.local_arrival_time);
+    // 1、跨夜车处理
+    if (type === "overnight") {
+      // 使用 moment 判断 endTime 时间是否大于 00:20
+      if (endTime.isAfter(maxTime)) {
+        // endTime 大于 00:20，分劈为两段时间
+
+        // 第一段：从 startTime 到 24:00,深拷贝生成新的对象firstSegment
+        let firstSegment = JSON.parse(JSON.stringify(train));
+        firstSegment["local_departure_time"] = "24:00";
+        //配置孪生数据
+        firstSegment["twins_id_first"] = train["train_sched_id"] + "_1";
+        firstSegment["twins_id_second"] = train["train_sched_id"] + "_2";
+
+        // 第二段：从 00:00 到 endTime
+        let secondSegment = JSON.parse(JSON.stringify(train));
+        secondSegment["local_arrival_time"] = "00:00";
+        secondSegment["twins_id_first"] = train["train_sched_id"] + "_2";
+        secondSegment["twins_id_second"] = train["train_sched_id"] + "_1";
+        //secondSegment["local_departure_time"] = endTime.format("HH:mm");
+
+        // 绘制第一段
+        classifyTrainSingle(firstSegment, element, "normal");
+
+        // 绘制第二段
+        classifyTrainSingle(secondSegment, element, "normal");
+
+        console.log('classifyTrainTwins | firstSegment', firstSegment);
+        console.log('classifyTrainTwins | secondSegment', secondSegment);
+        return;
+      } else {
+        // endTime 小于等于 00:20，直接绘制
+
+      }
+    }
+    // 2、通过车处理
+    if (type === "through") {
+      // 通过车的处理逻辑
+      drawTrainSingleThrough(train, element, type);
+
+    }
+
+    if (type === "normal") {
+      // 普通车处理逻辑
+      drawTrainSingleNormal(train, element, type);
+    }
+    // 3、最后摆位置
+  }
+
+
+  ///////////////////////////////////////////////////////////////
+  // 绘制函数：单个车次通过车绘制
+  // 
+  ///////////////////////////////////////////////////////////////
+  function drawTrainSingleThrough(train, element, type) {
+
+  }
+  ///////////////////////////////////////////////////////////////
+  // 绘制函数：单个车次普通车绘制
+  // 
+  ///////////////////////////////////////////////////////////////
+  function drawTrainSingleNormal(train, element, type) {
+    //如果到达车次为/，则不画
+    if (train["arrival_train_number"] == "/") {
+      console.log("arrival_train_number is /");
+      return;
+    }
+    //如果出发车次为/，则不画
+    if (train["departure_train_number"] == "/") {
+      console.log("departure_train_number is /");
+      return;
+    }
+    var startRow = traintotal + 1 - station_track; //将股道编号转换为所在的股道行
+
+    var [arrival_hour, arrival_minute] = arrival_time.split(":").map(Number);
+
+    //将arrival_minute表示的分钟不满10的补0
+    arrival_minute = arrival_minute < 10 ? "0" + arrival_minute : arrival_minute;
+    var startCol = arrival_hour * 6 + Math.floor(arrival_minute / 10) + 1;
+
+    var startFraction = arrival_minute % 10; //将到达时间的分钟转换为分数
+    var [departure_hour, departure_minute] = departure_time
+      .split(":")
+      .map(Number);
+
+    departure_minute =
+      departure_minute < 10 ? "0" + departure_minute : departure_minute;
+    var endCol = getTimeIndex(departure_time);
+
+    arrival_time =
+      arrival_hour < 10 ?
+      "0" + arrival_hour + ":" + arrival_minute :
+      arrival_hour + ":" + arrival_minute;
+    departure_time =
+      departure_hour < 10 ?
+      "0" + departure_hour + ":" + departure_minute :
+      departure_hour + ":" + departure_minute;
+
+    var endFraction = departure_minute % 10;
+
+  }
+
+
+
+  //创建SVG的高度的函数
+  function crateSVGHeight() {
+    //计算svg应该多高
+    svgHeight = 47 * lineArray.length;
+    svg.setAttribute("height", svgHeight);
+    console.log("svgHeight", svgHeight);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ///////////////////////////////////////////////////////////////
+  // 主执行函数：将车次按孪生车次和单个车次分类
+  // 并调用 classifyTrain 函数绘制列车
+  ///////////////////////////////////////////////////////////////
+  function processAndDisplayTrains(trainSchedules) {
+    const schedulesByTrack = {};
+    trainSchedules.forEach((train) => {
+      if (!schedulesByTrack[train.local_station_track]) {
+        schedulesByTrack[train.local_station_track] = [];
+      }
+      schedulesByTrack[train.local_station_track].push(train);
+    });
+    console.log(schedulesByTrack);
+
+    const pairs = [];
+    const singles = [];
+
+    for (const track in schedulesByTrack) {
+      const trains = schedulesByTrack[track];
+      const usedIndexes = new Set();
+
+      for (let i = 0; i < trains.length; i++) {
+        if (usedIndexes.has(i)) continue;
+
+        let hasPair = false;
+        for (let j = i + 1; j < trains.length; j++) {
+          if (isOverlapping(trains[i], trains[j])) {
+            hasPair = true;
+            usedIndexes.add(j);
+            pairs.push([trains[i], trains[j]]);
+          }
+        }
+
+        if (!hasPair) {
+          singles.push(trains[i]);
+        }
+      }
+    }
+    console.log("pairs:", pairs);
+    console.log("singles:", singles);
+
+    const schedulesDiv = document.getElementById("schedules");
+
+    // 显示重叠的车次对
+    pairs.forEach((pair) => {
+
+      const trackDiv = document.createElement("div");
+      trackDiv.className = "track";
+      pair.forEach((train, index) => {
+        const attribute = index === 0 ? "up" : "down";
+        const type = isOvernight(train) ?
+          "overnight" :
+          isThrough(train) ?
+          "through" :
+          "";
+        classifyTrainTwins(train, trackDiv, type, attribute);
+      });
+      schedulesDiv.appendChild(trackDiv);
+    });
+
+    // 显示不重叠的单个车次
+    singles.forEach((train) => {
+      const trackDiv = document.createElement("div");
+      trackDiv.className = "track";
+      const type = isOvernight(train) ?
+        "overnight" :
+        isThrough(train) ?
+        "through" :
+        "normal";
+      classifyTrainSingle(train, trackDiv, type); // 将 attribute 设置为 "single"
+      schedulesDiv.appendChild(trackDiv);
+    });
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  //待分拆的函数
+  //画线函数，参数 起点：td的行和列、几分之几。终点：td的行和列、几分之几。滚动条默认偏移量0
+  function drawLine2(
+    station_track,
+    arrival_train_number,
+    departure_train_number,
+    arrival_time,
+    departure_time,
+    startRow,
+    startCol,
+    arrival_minute,
+    endRow,
+    endCol,
+    departure_minute,
+    scrollLeft
+  ) {
+    var table = $("#train-line-table");
+
+    // 获取起点和终点的坐标
+    var containerOffset = {
+      top: 0,
+      left: 0,
+    };
+
+    var trOffset = 2; // 设置tr的偏移量值
+    startRow += trOffset;
+    endRow += trOffset;
+    //console.log("startRow:" + startRow);
+    //console.log("endRow:" + endRow);
+
+    var tdOffset = 0; // 设置td的偏移量值
+    startCol += tdOffset;
+    endCol += tdOffset;
+    //console.log("startCol:" + startCol);
+    // console.log("endCol:" + endCol);
+
+    //计算tr偏移量的高度值是多少
+    for (var i = 1; i <= trOffset; i++) {
+      var trHeightOffset = table.find("tr:nth-child(" + i + ")").height();
+      containerOffset.top -= trHeightOffset;
+    }
+    var startFraction = arrival_minute % 10;
+    var endFraction = departure_minute %
+      10; // 获取滚动条的位置 // console.log("startCol:" + startCol); // console.log("endCol:" + endCol); // 获取td的高度 var
+    startTd = table.find("tr:nth-child(" + startRow + ") > td:nth-child(" + startCol + ")");
+    var
+      endTd = table.find("tr:nth-child(" + endRow + ") > td:nth-child(" + endCol + ")");
+    var
+      startPoint = startTd
+      .position(); // 获取起点坐标 var endPoint=endTd.position(); // 获取终点的坐标 var lineStartX=startPoint.left +
+    containerOffset.left + scrollLeft + (startTd.width() * startFraction) / 10;
+    var lineStartY = startPoint.top +
+      containerOffset.top + startTd.height() / 2;
+    var lineEndX = endPoint.left + containerOffset.left + scrollLeft +
+      (endTd.width() * endFraction) / 10;
+    var lineEndY = endPoint.top + containerOffset.top + endTd.height() / 2;
+    var
+      lineWidth = lineEndX - lineStartX; // 获取#drawing-layer层 var drawingLayer=$("#drawing-layer"); //创建linebox元素 var
+    linebox = $('<div class="linebox" id="' + arrival_train_number + '">');
+
+    // 创建一个g元素
+
+    var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    //给g元素设置id
+    g.setAttribute("id", arrival_train_number);
+
+    g.setAttribute("data-arrivalTrainNumber", arrival_train_number);
+    g.setAttribute("data-departureTrainNumber", departure_train_number);
+    g.setAttribute("data-arrivalTime", arrival_time);
+    g.setAttribute("data-departureTime", departure_time);
+    g.setAttribute("data-station_track", station_track);
+
+    //添加class
+    g.setAttribute("class", "draggable-group");
+
+    //如果startCol==endCol AND arrival_minute==departure_minute，则画圆圈
+    if (startCol == endCol && arrival_minute == departure_minute) {
+      var circle = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "circle"
+      ); // 创建一个circle元素
+      circle.setAttribute("cx", 15); // 设置圆心的x坐标
+      circle.setAttribute("cy", 19); // 设置圆心的y坐标
+      circle.setAttribute("r", 4); // 设置圆的半径
+
+      circle.setAttribute("fill", "green"); // 设置圆的填充颜色
+      circle.setAttribute("stroke", "black"); //设置外圈颜色
+      circle.setAttribute("stroke-width", "1"); //设置外圈宽度
+
+      //计算线的中点//车次
+      //var lineMiddleX = (lineStartX + lineEndX) / 2;
+      var $txt_trainNum = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "text"
+      );
+      // 设置<text>元素的属性
+      $txt_trainNum.setAttribute("x", 15); // 文本的水平位置
+      $txt_trainNum.setAttribute("y", 12); // 文本的垂直位置
+      $txt_trainNum.setAttribute("text-anchor", "middle"); // 文本在x位置的水平对齐方式
+      $txt_trainNum.setAttribute("fill", "#2f2c2c");
+      $txt_trainNum.textContent = arrival_train_number; // 设置文本内容
+      //disableSelection($text3); //禁止选中文本
+
+      $txt_trainNum.classList.add("unselectable"); //给文本增加一个unselectable类
+
+      // 创建一个新的<text>元素//通过时间
+      var $text_TrainThrough = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "text"
+      );
+      $text_TrainThrough.setAttribute("x", 9); // 文本的水平位置
+      $text_TrainThrough.setAttribute("y", 35); // 文本的垂直位置
+      $text_TrainThrough.setAttribute("text-anchor", "right"); // 文本在x位置的水平对齐方式
+      $text_TrainThrough.textContent = arrival_minute; // 设置文本内容
+      //disableSelection($text_TrainThrough); //禁止选中文本
+      $text_TrainThrough.classList.add("unselectable");
+
+      //创建一个rect元素
+      var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      //rect.setAttribute("y", lineStartY - 16);
+      rect.setAttribute("y", 0);
+
+      rect.setAttribute("x", 0);
+      rect.setAttribute("width", 30);
+
+      rect.setAttribute("height", 38);
+      rect.setAttribute("fill", "transparent");
+      rect.setAttribute("stroke", "grey");
+      rect.setAttribute("stroke-width", 1);
+      //rect.setAttribute("fill", "yellow"); //背景色填充
+      rect.setAttribute("fill", "rgba(255, 255, 0, 0.3)"); // 半透明
+
+      g.append(rect, circle, $txt_trainNum, $text_TrainThrough); // 将圆添加到SVG元素中
+      g.setAttribute(
+        "transform",
+        "translate(" + (lineStartX - 15) + "," + (lineStartY - 19) + ")"
+      ); //20240911
+
+      svg.append(g);
+      /////////////////////////////////////////////////////////////////////
+      // 给元素g绑定鼠标在上面的监听，显示车次详细信息
+      g.addEventListener("mouseenter", function () {
+        // 获取#g-info-box
+        var infoBox = document.getElementById("g-info-box");
+        if (arrival_train_number == departure_train_number) {
+          //读取g元素的data-station_track属性
+          var track_id = this.getAttribute("data-station_track");
+
+          infoBox.innerHTML =
+            "安排股道: <span id='track_id'>" +
+            track_id +
+            "</span><br>车次： " +
+            arrival_train_number +
+            "<br>到达时间： " +
+            arrival_time +
+            "<br>出发时间： " +
+            departure_time;
+        } else {
+          infoBox.innerHTML =
+            "安排股道: <span id='track_id'>" +
+            station_track +
+            "</span><br>到达车次： " +
+            arrival_train_number +
+            "<br>出发车次 " +
+            departure_train_number +
+            "<br>到达时间： " +
+            arrival_time +
+            "<br>出发时间 " +
+            departure_time;
+        }
+
+        // 显示#g-info-box
+        infoBox.style.display = "block";
+        //设置#g-info-box的位置
+        //如果infoBox的底部超过屏幕底部，则调整位置
+        if (event.pageY + infoBox.offsetHeight > window.innerHeight) {
+          infoBox.style.top = event.pageY - infoBox.offsetHeight - 10 + "px";
+        } else {
+          infoBox.style.top = event.pageY + 10 + "px";
+        }
+        // 如果infoBox的的右侧超过屏幕右侧，则调整位置
+        if (event.pageX + infoBox.offsetWidth > window.innerWidth) {
+          infoBox.style.left = event.pageX - infoBox.offsetWidth - 10 + "px";
+        } else {
+          infoBox.style.left = event.pageX + 10 + "px";
+        }
+      });
+
+      g.addEventListener("mouseleave", function () {
+        // 隐藏#g-info-box
+        var infoBox = document.getElementById("g-info-box");
+        infoBox.style.display = "none";
+      });
+
+      ////////////////////////////////////////////////////////////////////////////////////////////
+      // 修改的
+    } else {
+      // 创建一个path元素
+      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      var calcEndX = lineEndX - lineStartX + 10; // 计算线段的长度
+      // 设置<path>元素的属性
+      path.setAttribute("d", "M " + 10 + " " + 20 + " L " + calcEndX + " " + 20);
+      path.setAttribute("fill", "skyblue");
+      path.setAttribute("stroke", "red");
+      path.setAttribute("stroke-width", "3");
+
+      // 创建一个新的<text>元素//到达时间
+      var $text1 = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      $text1.setAttribute("x", 10); // 文本的水平位置
+      $text1.setAttribute("y", 33); // 文本的垂直位置
+      $text1.setAttribute("text-anchor", "end"); // 文本在x位置的水平对齐方式
+      //$text1.textContent = startFraction; // 设置文本内容
+      $text1.textContent = arrival_minute; // 设置文本内容
+
+      $text1.setAttribute("fill", "#2f2c2c");
+      $text1.classList.add("unselectable"); //给文本增加一个unselectable类
+
+      //出发时间
+      var $text2 = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      // 设置<$text2>元素的属性
+      $text2.setAttribute("x", calcEndX); // 文本的水平位置
+      $text2.setAttribute("y", 33); // 文本的垂直位置
+      $text2.setAttribute("text-anchor", "start"); // 文本在x位置的水平对齐方式
+
+      $text2.setAttribute("fill", "#2f2c2c");
+
+      //$text2.textContent = endFraction; // 设置文本内容
+      $text2.textContent = departure_minute; // 设置文本内容
+      $text2.classList.add("unselectable"); //给文本增加一个unselectable类
+
+      if (arrival_train_number === departure_train_number) {
+        //计算线的中点//车次
+        var lineMiddleX = (lineEndX - lineStartX) / 2 + 10;
+        var $text3 = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        // 设置<text>元素的属性
+        //$text3.setAttribute("x", lineMiddleX); // 文本的水平位置
+        //左对齐
+        $text3.setAttribute("x", lineMiddleX); // 文本的水平位置
+
+        $text3.setAttribute("y", 14); // 文本的垂直位置
+        $text3.setAttribute("text-anchor", "middle"); // 文本在x位置的水平对齐方式
+        $text3.setAttribute("fill", "#2f2c2c");
+        $text3.textContent = arrival_train_number; // 设置文本内容
+        $text3.classList.add("unselectable"); //给文本增加一个unselectable类
+        var $text4 = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+      } else {
+        var $text3 = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        // 设置<text>元素的属性
+        //$text3.setAttribute("x", lineMiddleX); // 文本的水平位置
+        //左对齐
+        $text3.setAttribute("x", 0); // 文本的水平位置
+
+        $text3.setAttribute("y", 14); // 文本的垂直位置
+        $text3.setAttribute("text-anchor", "left"); // 文本在x位置的水平对齐方式
+        $text3.setAttribute("fill", "#2f2c2c");
+        $text3.textContent = arrival_train_number; // 设置文本内容
+        $text3.classList.add("unselectable"); //给文本增加一个unselectable类
+
+        //计算线的中点//车次
+
+        var $text4 = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        // 设置<text>元素的属性
+        //$text3.setAttribute("x", lineMiddleX); // 文本的水平位置
+        //左对齐
+        $text4.setAttribute("x", lineEndX - lineStartX); // 文本的水平位置
+
+        $text4.setAttribute("y", 14); // 文本的垂直位置
+        $text4.setAttribute("text-anchor", "right"); // 文本在x位置的水平对齐方式
+        $text4.setAttribute("fill", "#2f2c2c");
+        $text4.textContent = departure_train_number; // 设置文本内容
+        $text4.classList.add("unselectable"); //给文本增加一个unselectable类
+      }
+
+      //创建一个rect元素
+      var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      //rect.setAttribute("y", lineStartY - 16);
+      rect.setAttribute("y", 0);
+
+      rect.setAttribute("x", 0);
+      rect.setAttribute("width", lineEndX - lineStartX + 20);
+
+      rect.setAttribute("height", 38);
+      rect.setAttribute("fill", "transparent");
+      rect.setAttribute("stroke", "grey");
+      rect.setAttribute("stroke-width", 1);
+      //背景色填充
+      //rect.setAttribute("fill", "yellow"); // 设置填充颜色
+      rect.setAttribute("fill", "rgba(255,255,0, 0.3)"); // 半透明的红色
+
+      g.append(rect, path, $text1, $text2, $text3, $text4);
+
+      // 设置g元素的transform属性 20240911
+      g.setAttribute(
+        "transform",
+        "translate(" + (lineStartX - 10) + "," + (lineStartY - 19) + ")"
+      ); //
+
+      /////////////////////////////////////////////////////////////////////
+      // 给元素g绑定鼠标在上面的监听，显示车次详细信息
+      g.addEventListener("mouseenter", function () {
+        // 获取#g-info-box
+        var infoBox = document.getElementById("g-info-box");
+
+        //读取g元素的data-station_track属性
+        var track_id = this.getAttribute("data-station_track");
+        if (arrival_train_number == departure_train_number) {
+          //分行显示
+
+          infoBox.innerHTML =
+            "安排股道: <span id='track_id'>" +
+            track_id +
+            "</span><br>车次： " +
+            arrival_train_number +
+            "<br>到达时间： " +
+            arrival_time +
+            "<br>出发时间： " +
+            departure_time;
+        } else {
+          infoBox.innerHTML =
+            "安排股道: <span id='track_id'>" +
+            track_id +
+            "</span><br>到达车次： " +
+            arrival_train_number +
+            "<br>出发车次 " +
+            departure_train_number +
+            "<br>到达时间： " +
+            arrival_time +
+            "<br>出发时间 " +
+            departure_time;
+        }
+
+        // 显示#g-info-box
+        infoBox.style.display = "block";
+        //如果infoBox的底部超过屏幕底部，则调整位置
+        if (event.pageY + infoBox.offsetHeight > window.innerHeight) {
+          infoBox.style.top = event.pageY - infoBox.offsetHeight - 10 + "px";
+        } else {
+          infoBox.style.top = event.pageY + 10 + "px";
+        }
+        // 如果infoBox的的右侧超过屏幕右侧，则调整位置
+        if (event.pageX + infoBox.offsetWidth > window.innerWidth) {
+          infoBox.style.left = event.pageX - infoBox.offsetWidth - 10 + "px";
+        } else {
+          infoBox.style.left = event.pageX + 10 + "px";
+        }
+      });
+
+      g.addEventListener("mouseleave", function () {
+        // 隐藏#g-info-box
+        var infoBox = document.getElementById("g-info-box");
+        infoBox.style.display = "none";
+      });
+
+      svg.append(g);
+    }
+  }
+</script>
